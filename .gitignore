@@ -1,0 +1,7 @@
+.idea
+*.json
+*.exe
+*.run
+*.txt
+*.csv
+*.log
