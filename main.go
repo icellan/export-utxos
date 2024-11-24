@@ -54,7 +54,9 @@ func main() {
 		}
 
 		// process the addresses
-		output = ProcessAddresses(addresses)
+		output = ProcessAddresses(addresses, func(idx int) {
+			fmt.Printf("Fetching UTXOs for address %s (%d out of %d)\r", addresses[idx], idx+1, len(addresses))
+		})
 	} else if flag.NArg() > 0 {
 		// address mode
 		address := flag.Arg(0)
@@ -63,7 +65,10 @@ func main() {
 			return
 		}
 
-		output = ProcessAddresses([]string{address})
+		fmt.Printf("Processing 1 address: %s", address)
+		output = ProcessAddresses([]string{address}, func(int) {
+			return
+		})
 	} else {
 		// no file and no address given, ask the user to paste a list of addresses
 		fmt.Println("Please paste a list of addresses, one per line, followed by a blank line:")
@@ -90,8 +95,12 @@ func main() {
 		}
 
 		// process the addresses
-		output = ProcessAddresses(addresses)
+		output = ProcessAddresses(addresses, func(idx int) {
+			fmt.Printf("Fetching UTXOs for address %s (%d out of %d)\r", addresses[idx], idx+1, len(addresses))
+		})
 	}
+
+	fmt.Println("\nProcessing done, outputting...")
 
 	// marshal the output to JSON
 	outputJSON, err := json.MarshalIndent(output, "", "  ")
@@ -115,14 +124,12 @@ func main() {
 	}
 }
 
-func ProcessAddresses(addresses []string) models.Output {
+func ProcessAddresses(addresses []string, progressFunc func(int)) models.Output {
 	output := models.Output{}
 
-	// do something with the address
-	fmt.Printf("Processing %d addresses: %v\n", len(addresses), addresses)
-
 	for idx, address := range addresses {
-		addressUtxos, err := fetchUtxosOfAddress(address, idx, len(addresses))
+		progressFunc(idx)
+		addressUtxos, err := fetchUtxosOfAddress(address)
 		if err != nil {
 			fmt.Println("Error fetching UTXOs:", err)
 			return nil
@@ -131,8 +138,6 @@ func ProcessAddresses(addresses []string) models.Output {
 		// do something with the UTXOs
 		output = append(output, addressUtxos)
 	}
-
-	fmt.Println("\nProcessing done")
 
 	return output
 }
@@ -158,9 +163,8 @@ func ProcessAddresses(addresses []string) models.Output {
 
 var txCache = make(map[string]string)
 
-func fetchUtxosOfAddress(address string, idx, numberOf int) (*models.UtxoList, error) {
+func fetchUtxosOfAddress(address string) (*models.UtxoList, error) {
 	time.Sleep(350 * time.Millisecond) // overcome rate limit 3 RPS
-	fmt.Printf("Fetching UTXOs for address %s (%d out of %d)\r", address, idx+1, numberOf)
 
 	// GET https://api.whatsonchain.com/v1/bsv/<network>/address/<address>/unspent/all
 	resp, err := http.Get(fmt.Sprintf("https://api.whatsonchain.com/v1/bsv/main/address/%s/unspent/all", address))
