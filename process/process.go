@@ -8,26 +8,34 @@ import (
 	"time"
 
 	"github.com/bitcoin-sv/go-sdk/chainhash"
+	"github.com/bitcoin-sv/go-sdk/script"
+	"github.com/bitcoin-sv/go-sdk/transaction"
 	"github.com/icellan/export-utxos/models"
-	"github.com/libsv/go-bt/v2"
 )
 
-func Addresses(addresses []string, progressFunc func(int)) models.Output {
+func Addresses(addresses []string, progressFunc func(int)) (models.Output, error) {
 	output := models.Output{}
+
+	// first check whether all the addresses are valid
+	for _, address := range addresses {
+		_, err := script.NewAddressFromString(address)
+		if err != nil {
+			return nil, fmt.Errorf("invalid address: %s", address)
+		}
+	}
 
 	for idx, address := range addresses {
 		progressFunc(idx)
 		addressUtxos, err := fetchUtxosOfAddress(address)
 		if err != nil {
-			fmt.Println("Error fetching UTXOs:", err)
-			return nil
+			return nil, fmt.Errorf("error fetching UTXOs: %v", err)
 		}
 
 		// do something with the UTXOs
 		output = append(output, addressUtxos)
 	}
 
-	return output
+	return output, nil
 }
 
 var txCache = make(map[string]string)
@@ -89,7 +97,7 @@ func fetchUtxosOfAddress(address string) (*models.UtxoList, error) {
 		}
 
 		// decode the transaction
-		tx, err := bt.NewTxFromString(txHex)
+		tx, err := transaction.NewTransactionFromHex(txHex)
 		if err != nil {
 			return nil, err
 		}

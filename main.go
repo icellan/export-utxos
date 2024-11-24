@@ -19,17 +19,18 @@ func main() {
 
 	if help != nil && *help {
 		fmt.Println("Usage: main [-help] [-file <filename>] [<address>]")
-		return
+		os.Exit(1)
 	}
 
 	var output models.Output
+	var err error
 
 	if inputFile != nil && *inputFile != "" {
 		// file mode, read addresses from file and process
 		f, err := os.Open(*inputFile)
 		if err != nil {
 			fmt.Println("Error opening file:", err)
-			return
+			os.Exit(1)
 		}
 
 		// read addresses from file
@@ -46,25 +47,33 @@ func main() {
 
 		if len(addresses) == 0 {
 			fmt.Println("No addresses found in file")
-			return
+			os.Exit(1)
 		}
 
 		// process the addresses
-		output = process.Addresses(addresses, func(idx int) {
+		output, err = process.Addresses(addresses, func(idx int) {
 			fmt.Printf("Fetching UTXOs for address %s (%d out of %d)\r", addresses[idx], idx+1, len(addresses))
 		})
+		if err != nil {
+			fmt.Println("Error processing addresses:", err)
+			os.Exit(1)
+		}
 	} else if flag.NArg() > 0 {
 		// address mode
 		address := flag.Arg(0)
 		if address == "" {
 			fmt.Println("No address given")
-			return
+			os.Exit(1)
 		}
 
 		fmt.Printf("Processing 1 address: %s", address)
-		output = process.Addresses([]string{address}, func(int) {
+		output, err = process.Addresses([]string{address}, func(int) {
 			return
 		})
+		if err != nil {
+			fmt.Println("Error processing address:", err)
+			os.Exit(1)
+		}
 	} else {
 		// no file and no address given, ask the user to paste a list of addresses
 		fmt.Println("Please paste a list of addresses, one per line, followed by a blank line:")
@@ -87,13 +96,17 @@ func main() {
 
 		if len(addresses) == 0 {
 			fmt.Println("No addresses given")
-			return
+			os.Exit(1)
 		}
 
 		// process the addresses
-		output = process.Addresses(addresses, func(idx int) {
+		output, err = process.Addresses(addresses, func(idx int) {
 			fmt.Printf("Fetching UTXOs for address %s (%d out of %d)\r", addresses[idx], idx+1, len(addresses))
 		})
+		if err != nil {
+			fmt.Println("Error processing addresses:", err)
+			os.Exit(1)
+		}
 	}
 
 	fmt.Println("\nProcessing done, outputting...")
@@ -102,7 +115,7 @@ func main() {
 	outputJSON, err := json.MarshalIndent(output, "", "  ")
 	if err != nil {
 		fmt.Println("Error marshalling JSON:", err)
-		return
+		os.Exit(1)
 	}
 
 	if outputFile != nil && *outputFile != "" {
@@ -110,7 +123,7 @@ func main() {
 		// write the output to a file if specified
 		if err = os.WriteFile(*outputFile, outputJSON, 0644); err != nil {
 			fmt.Println("Error writing output file:", err)
-			return
+			os.Exit(1)
 		}
 
 		fmt.Println("Output written successfully")
@@ -118,4 +131,6 @@ func main() {
 		// print the output
 		fmt.Println(string(outputJSON))
 	}
+
+	os.Exit(0)
 }
